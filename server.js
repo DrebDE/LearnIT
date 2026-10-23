@@ -8,7 +8,7 @@ import JSZip from 'jszip';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '100mb' }));
 app.use(express.static(__dirname));
 
 const aiConfigured = () => Boolean(process.env.AI_API_KEY && process.env.AI_API_KEY !== 'replace-me' && process.env.AI_MODEL && !process.env.AI_MODEL.startsWith('replace-'));
@@ -33,9 +33,55 @@ async function fetchEutils(url) {
   eutilsQueue = task.then(() => undefined, () => undefined);
   return task;
 }
-async function searchEntrez(db, query, retmax = '6') {
+const fieldSearchProfiles = {
+  MLS: {
+    search: ['medical laboratory science', 'medical technology', 'clinical laboratory', 'laboratory medicine', 'laboratory diagnosis', 'diagnostic testing', 'hematology', 'transfusion', 'blood bank', 'clinical chemistry', 'immunohematology'],
+    relevant: ['laborator', 'diagnostic', 'test', 'assay', 'specimen', 'transfusion', 'blood bank', 'blood cell', 'cell count', 'morphology', 'coagulation', 'clinical chemistry', 'cytolog', 'histopatholog', 'microbiolog', 'urinalysis', 'serology', 'quality control', 'hemoglobin', 'haemoglobin']
+  },
+  Nursing: {
+    search: ['nursing', 'nursing care', 'patient care', 'nursing practice', 'nursing education', 'nursing assessment', 'nursing intervention', 'clinical nursing'],
+    relevant: ['nurs', 'patient care', 'care delivery', 'clinical practice', 'nursing education', 'nursing assessment', 'nursing intervention', 'medication safety', 'therapeutic communication', 'nursing research']
+  },
+  Psychology: {
+    search: ['psychology', 'psychological', 'cognitive', 'behavior', 'behaviour', 'psychometrics', 'psychotherapy', 'mental health', 'developmental psychology'],
+    relevant: ['psycholog', 'cognitive', 'behavior', 'behaviour', 'mental health', 'psychometric', 'personality', 'psychotherapy', 'developmental', 'learning', 'memory', 'social psychology', 'neuropsych']
+  },
+  Pharmacy: {
+    search: ['pharmacy', 'pharmacist', 'pharmaceutical', 'pharmacology', 'pharmacotherapy', 'pharmaceutics', 'medication safety', 'clinical pharmacy', 'drug discovery'],
+    relevant: ['pharmac', 'medicine', 'medication', 'drug', 'pharmaceutical', 'dispensing', 'pharmacotherapy', 'pharmaceutics', 'pharmacognosy', 'pharmacology', 'toxicology', 'dosage form', 'medicinal chemistry', 'pharmacy practice', 'pharmacy law']
+  }
+};
+function scopedQuery(query, fields, db) {
+  const profileTerms = [...new Set(fields.flatMap(field => fieldSearchProfiles[field]?.search || []))];
+  if (!profileTerms.length) return query;
+  const tag = db === 'pubmed' ? '[Title/Abstract]' : '';
+  const topic = db === 'pubmed' && /\s/.test(query) ? `"${query}"${tag}` : `${query}${tag}`;
+  const context = profileTerms.map(term => `"${term}"${tag}`).join(' OR ');
+  return `(${topic}) AND (${context})`;
+}
+function normalizeSearchText(value) {
+  return String(value || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+function matchesQuery(item, query) {
+  const documentText = normalizeSearchText([item.title, item.snippet, item.venue].join(' '));
+  const stopWords = new Set(['and', 'the', 'for', 'with', 'from', 'into', 'about', 'what', 'how', 'why', 'theory', 'study', 'studies', 'basic', 'basics', 'introduction']);
+  const terms = normalizeSearchText(query).split(/\s+/).filter(term => term.length > 2 && !stopWords.has(term));
+  if (!terms.length) return true;
+  const hits = terms.filter(term => documentText.includes(term) || (term.endsWith('y') && documentText.includes(term.slice(0, -1))));
+  const title = normalizeSearchText(item.title);
+  const exactTitlePhrase = title.includes(normalizeSearchText(query));
+  return exactTitlePhrase || hits.length === terms.length;
+}
+function matchesField(item, field) {
+  const documentText = normalizeSearchText([item.title, item.snippet, item.venue, item.provider, item.type].join(' '));
+  return (fieldSearchProfiles[field]?.relevant || []).some(term => documentText.includes(normalizeSearchText(term)));
+}
+function filterRelevantResults(results, query, fields) {
+  return results.filter(item => matchesQuery(item, query) && (!fields.length || fields.some(field => matchesField(item, field))));
+}
+async function searchEntrez(db, query, retmax = '6', fields = []) {
   const searchUrl = new URL('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi');
-  searchUrl.search = new URLSearchParams({ db, term: query, retmode: 'json', retmax, sort: 'relevance' }).toString();
+  searchUrl.search = new URLSearchParams({ db, term: scopedQuery(query, fields, db), retmode: 'json', retmax, sort: 'relevance' }).toString();
   const searchResponse = await fetchEutils(searchUrl);
   if (!searchResponse.ok) throw new Error(`NCBI ${db} search returned ${searchResponse.status}`);
   const searchData = await searchResponse.json();
@@ -52,9 +98,9 @@ async function searchEntrez(db, query, retmax = '6') {
 function cleanAbstract(value = '') {
   return String(value).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim().slice(0, 420);
 }
-async function searchEuropePmc(query) {
+async function searchEuropePmc(query, fields = []) {
   const url = new URL('https://www.ebi.ac.uk/europepmc/webservices/rest/search');
-  url.search = new URLSearchParams({ query, format: 'json', pageSize: '8', resultType: 'core', sort: 'P_PDATE_D' }).toString();
+  url.search = new URLSearchParams({ query: scopedQuery(query, fields, 'europepmc'), format: 'json', pageSize: '8', resultType: 'core', sort: 'P_PDATE_D' }).toString();
   const response = await fetch(url, { headers: { 'User-Agent': 'LearnIT student research search' }, signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error(`Europe PMC returned ${response.status}`);
   const data = await response.json();
@@ -87,11 +133,13 @@ async function searchCrossref(query) {
 app.get('/api/search', async (req, res) => {
   const query = String(req.query.q || '').trim().replace(/[\u0000-\u001f]/g, '').slice(0, 180);
   if (query.length < 2) return res.status(400).json({ error: 'Enter at least 2 characters to search the online library.' });
-  const cacheKey = query.toLowerCase();
+  const requestedFields = String(req.query.fields || '').split(',').map(field => field.trim()).filter(field => field in fieldSearchProfiles);
+  const fields = [...new Set(requestedFields)];
+  const cacheKey = `${fields.slice().sort().join(',')}|${query.toLowerCase()}`;
   const cached = onlineLibraryCache.get(cacheKey);
   if (cached && Date.now() - cached.time < cacheMs) return res.json(cached.value);
   try {
-    const settled = await Promise.allSettled([searchEntrez('books', query, '8'), searchEntrez('pubmed', query, '8'), searchEuropePmc(query), searchCrossref(query)]);
+    const settled = await Promise.allSettled([searchEntrez('books', query, '8', fields), searchEntrez('pubmed', query, '8', fields), searchEuropePmc(query, fields), searchCrossref(query)]);
     const [booksResult, papersResult, europeResult, crossrefResult] = settled;
     const books = booksResult.status === 'fulfilled' ? booksResult.value.ids.map(uid => {
       const item = booksResult.value.summary[uid] || {};
@@ -120,9 +168,10 @@ app.get('/api/search', async (req, res) => {
         fullText: '', doi: '', snippet: '', provider: 'PubMed', type: 'Research article'
       };
     }) : [];
-    const results = [...books, ...(europeResult.status === 'fulfilled' ? europeResult.value.results : []), ...pubmed, ...(crossrefResult.status === 'fulfilled' ? crossrefResult.value.results : [])];
+    const results = filterRelevantResults([...books, ...(europeResult.status === 'fulfilled' ? europeResult.value.results : []), ...pubmed, ...(crossrefResult.status === 'fulfilled' ? crossrefResult.value.results : [])], query, fields);
     const value = {
       results,
+      fields,
       errors: {
         bookshelf: booksResult.status === 'rejected' ? 'NCBI Bookshelf is unavailable right now.' : '',
         pubmed: papersResult.status === 'rejected' ? 'PubMed is unavailable right now.' : '',
@@ -144,11 +193,11 @@ app.get('/api/search', async (req, res) => {
     return res.status(502).json({ error: 'The online library is unavailable right now. Please try again shortly.' });
   }
 });
-app.post('/api/extract', async (req, res) => {
+app.post('/api/extract', express.raw({ type: 'application/octet-stream', limit: '100mb' }), async (req, res) => {
   try {
-    const { name, data } = req.body || {};
-    if (!name || !data) return res.status(400).json({ error: 'Choose a file to extract.' });
-    const buffer = Buffer.from(data, 'base64');
+    const name = String(req.query.name || '');
+    if (!name || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Choose a file to extract.' });
+    const buffer = req.body;
     const ext = path.extname(name).toLowerCase();
     let text = '';
     if (ext === '.txt') text = buffer.toString('utf8');
@@ -173,7 +222,7 @@ app.post('/api/extract', async (req, res) => {
       text = pieces.join('\n\n');
     } else return res.status(415).json({ error: 'Unsupported file. Upload PDF, DOCX, PPTX, or TXT.' });
     if (!text.trim()) return res.status(422).json({ error: 'No readable text could be extracted from this file.' });
-    res.json({ text: text.slice(0, 120000), truncated: text.length > 120000 });
+    res.json({ text, truncated: false });
   } catch (e) { res.status(422).json({ error: `Could not extract text: ${e.message}` }); }
 });
 app.post('/api/ai', async (req, res) => {

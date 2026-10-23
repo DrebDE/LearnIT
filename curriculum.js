@@ -67,5 +67,32 @@ window.LEARNIT_PROGRAMS = [
       ['Psychological assessment', 'Psychometrics, reliability, validity, testing ethics, and responsible interpretation'],
       ['Counseling, I/O, and community psychology', 'Applied psychology pathways, ethics, community context, and supervised practice']
     ]
+  },
+  {
+    field: 'Pharmacy',
+    degree: 'BS Pharmacy',
+    basis: 'CHED CMO No. 25, s. 2021',
+    description: 'Suggested study areas based on CHED pharmacy standards and published Philippine university curricula. Course sequences vary by school.',
+    sources: [
+      { label: 'CHED: BS Pharmacy program standards (CMO 25, s. 2021)', url: 'https://ched.gov.ph/wp-content/uploads/CMO-No-25-series-2021-PSG-for-BS-Pharmacy.pdf' },
+      { label: 'UST General Santos: BS Pharmacy curriculum (effective AY 2024–2025)', url: 'https://gensan.ust.edu.ph/academicprograms/bachelor-of-science-in-pharmacy/' },
+      { label: 'UP Manila College of Pharmacy: BS Pharmacy curriculum', url: 'https://our.upm.edu.ph/node/210' }
+    ],
+    topics: [
+      ['Pharmacy practice and professional foundations', 'Pharmacy roles, Philippine practice settings, professional identity, ethics, and communication'],
+      ['Pharmaceutical calculations and compounding', 'Dose and concentration calculations, measurement, preparation, and safe compounding principles'],
+      ['Pharmaceutical chemistry and analysis', 'Inorganic, organic, medicinal, and analytical chemistry applied to medicines'],
+      ['Pharmaceutics and drug delivery', 'Dosage forms, formulation, biopharmaceutics, delivery systems, and product quality'],
+      ['Pharmacology and toxicology', 'Drug actions, therapeutic classes, adverse effects, toxicology, and evidence limits'],
+      ['Pharmacotherapeutics and clinical pharmacy', 'Patient-centered medication therapy concepts, disease states, monitoring, and evidence-based decisions'],
+      ['Pharmaceutical microbiology and parasitology', 'Microorganisms, parasites, contamination control, and relevant pharmaceutical applications'],
+      ['Pharmacognosy and natural products', 'Medicinal substances from natural sources, identification, quality, and safe-use concepts'],
+      ['Dispensing and medication safety', 'Prescription processing, medication-use systems, counseling, and error prevention'],
+      ['Pharmacy law, ethics, and regulation', 'Philippine pharmacy laws, professional responsibilities, regulatory systems, and ethical practice'],
+      ['Pharmacy administration and health economics', 'Management, leadership, pharmacoeconomics, health policy, and health technology assessment'],
+      ['Public health pharmacy and pharmacoepidemiology', 'Population medication use, prevention, medication safety, and medicine-use research'],
+      ['Drug discovery, manufacturing, and quality assurance', 'Medicine development, production principles, quality systems, and regulatory considerations'],
+      ['Pharmacy practice experience', 'Supervised learning across community, hospital, industrial, institutional, and public-health settings']
+    ]
   }
 ];
