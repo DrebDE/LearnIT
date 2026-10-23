@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: medstudy
+    name: learnit
     runtime: node
     plan: free
     buildCommand: npm install

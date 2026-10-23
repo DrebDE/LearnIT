@@ -49,52 +49,94 @@ async function searchEntrez(db, query, retmax = '6') {
   const summaryData = await summaryResponse.json();
   return { ids, count, summary: summaryData.result || {} };
 }
+function cleanAbstract(value = '') {
+  return String(value).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim().slice(0, 420);
+}
+async function searchEuropePmc(query) {
+  const url = new URL('https://www.ebi.ac.uk/europepmc/webservices/rest/search');
+  url.search = new URLSearchParams({ query, format: 'json', pageSize: '8', resultType: 'core', sort: 'P_PDATE_D' }).toString();
+  const response = await fetch(url, { headers: { 'User-Agent': 'LearnIT student research search' }, signal: AbortSignal.timeout(12000) });
+  if (!response.ok) throw new Error(`Europe PMC returned ${response.status}`);
+  const data = await response.json();
+  const rows = data.resultList?.result || [];
+  return { count: Number(data.hitCount || 0), results: rows.map(item => {
+    const pmid = item.pmid || (item.source === 'MED' ? item.id : '');
+    const pmcid = item.pmcid || '';
+    const doi = item.doi || '';
+    const fullText = item.isOpenAccess === 'Y' ? item.fullTextUrlList?.fullTextUrl?.find(link => /^https:\/\//i.test(link.url || ''))?.url || '' : '';
+    const url = pmid ? `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/` : pmcid ? `https://europepmc.org/articles/${encodeURIComponent(pmcid)}` : doi ? `https://doi.org/${encodeURIComponent(doi)}` : `https://europepmc.org/search?query=${encodeURIComponent(query)}`;
+    return { id: `epmc-${item.source || 'record'}-${item.id}`, title: item.title || 'Untitled Europe PMC record', authors: String(item.authorString || '').split(',').map(author => author.trim()).filter(Boolean).slice(0, 3), venue: item.journalTitle || item.bookOrReportDetails?.publisher || '', year: item.pubYear || '', url, fullText, doi, snippet: cleanAbstract(item.abstractText), provider: 'Europe PMC', type: pmcid && item.isOpenAccess === 'Y' ? 'Open-access article' : 'Research article' };
+  }) };
+}
+async function searchCrossref(query) {
+  const url = new URL('https://api.crossref.org/works');
+  url.search = new URLSearchParams({ 'query.bibliographic': query, rows: '8', select: 'DOI,title,author,container-title,published,created,type,URL,abstract' }).toString();
+  const response = await fetch(url, { headers: { 'User-Agent': 'LearnIT student literature search (https://github.com/DrebDE/LearnIT)' }, signal: AbortSignal.timeout(12000) });
+  if (!response.ok) throw new Error(`Crossref returned ${response.status}`);
+  const data = await response.json();
+  const rows = data.message?.items || [];
+  return { count: Number(data.message?.['total-results'] || 0), results: rows.map(item => {
+    const doi = item.DOI || '';
+    const date = item.published?.['date-parts']?.[0]?.[0] || item.created?.['date-parts']?.[0]?.[0] || '';
+    const title = Array.isArray(item.title) ? item.title[0] : item.title;
+    const authors = (item.author || []).slice(0, 3).map(author => [author.given, author.family].filter(Boolean).join(' ')).filter(Boolean);
+    const url = doi ? `https://doi.org/${encodeURIComponent(doi)}` : (/^https:\/\//i.test(item.URL || '') ? item.URL : '');
+    return { id: `crossref-${doi || title || Math.random()}`, title: title || 'Untitled scholarly work', authors, venue: (item['container-title'] || [])[0] || item.publisher || '', year: String(date || ''), url, fullText: '', doi, snippet: cleanAbstract(item.abstract), provider: 'Crossref', type: item.type === 'book' || item.type === 'book-chapter' ? 'Book or chapter' : 'Scholarly work' };
+  }).filter(item => item.url) };
+}
 app.get('/api/search', async (req, res) => {
   const query = String(req.query.q || '').trim().replace(/[\u0000-\u001f]/g, '').slice(0, 180);
-  if (query.length < 3) return res.status(400).json({ error: 'Enter at least 3 characters to search the online library.' });
+  if (query.length < 2) return res.status(400).json({ error: 'Enter at least 2 characters to search the online library.' });
   const cacheKey = query.toLowerCase();
   const cached = onlineLibraryCache.get(cacheKey);
   if (cached && Date.now() - cached.time < cacheMs) return res.json(cached.value);
   try {
-    const settled = await Promise.allSettled([searchEntrez('books', query), searchEntrez('pubmed', query, '8')]);
-    const [booksResult, papersResult] = settled;
-    const topics = booksResult.status === 'fulfilled' ? booksResult.value.ids.map(uid => {
+    const settled = await Promise.allSettled([searchEntrez('books', query, '8'), searchEntrez('pubmed', query, '8'), searchEuropePmc(query), searchCrossref(query)]);
+    const [booksResult, papersResult, europeResult, crossrefResult] = settled;
+    const books = booksResult.status === 'fulfilled' ? booksResult.value.ids.map(uid => {
       const item = booksResult.value.summary[uid] || {};
       const authors = (item.authors || []).slice(0, 3).map(author => typeof author === 'string' ? author : author.name).filter(Boolean);
       const accession = item.bookaccession || item.uid || uid;
       return {
-        uid,
+        id: `book-${uid}`,
         title: item.title || item.chapter || item.booktitle || 'NCBI Bookshelf topic',
         authors,
-        source: item.booktitle || item.publisher || item.source || 'NCBI Bookshelf',
+        venue: item.booktitle || item.publisher || item.source || 'NCBI Bookshelf',
         year: String(item.pubdate || '').match(/\b(19|20)\d{2}\b/)?.[0] || '',
-        url: `https://www.ncbi.nlm.nih.gov/books/${encodeURIComponent(accession)}/`
+        url: `https://www.ncbi.nlm.nih.gov/books/${encodeURIComponent(accession)}/`,
+        fullText: `https://www.ncbi.nlm.nih.gov/books/${encodeURIComponent(accession)}/`,
+        doi: '', snippet: '', provider: 'NCBI Bookshelf', type: 'Open textbook chapter'
       };
     }) : [];
-    const results = papersResult.status === 'fulfilled' ? papersResult.value.ids.map(pmid => {
+    const pubmed = papersResult.status === 'fulfilled' ? papersResult.value.ids.map(pmid => {
       const item = papersResult.value.summary[pmid] || {};
       return {
-        pmid,
+        id: `pubmed-${pmid}`,
         title: item.title || 'Untitled PubMed record',
         authors: (item.authors || []).slice(0, 3).map(author => author.name).filter(Boolean),
-        journal: item.fulljournalname || item.source || '',
+        venue: item.fulljournalname || item.source || '',
         year: String(item.pubdate || '').match(/\b(19|20)\d{2}\b/)?.[0] || '',
-        url: `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/`
+        url: `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/`,
+        fullText: '', doi: '', snippet: '', provider: 'PubMed', type: 'Research article'
       };
     }) : [];
+    const results = [...books, ...(europeResult.status === 'fulfilled' ? europeResult.value.results : []), ...pubmed, ...(crossrefResult.status === 'fulfilled' ? crossrefResult.value.results : [])];
     const value = {
-      topics,
       results,
       errors: {
         bookshelf: booksResult.status === 'rejected' ? 'NCBI Bookshelf is unavailable right now.' : '',
-        pubmed: papersResult.status === 'rejected' ? 'PubMed is unavailable right now.' : ''
+        pubmed: papersResult.status === 'rejected' ? 'PubMed is unavailable right now.' : '',
+        europepmc: europeResult.status === 'rejected' ? 'Europe PMC is unavailable right now.' : '',
+        crossref: crossrefResult.status === 'rejected' ? 'Crossref is unavailable right now.' : ''
       },
       counts: {
-        topics: booksResult.status === 'fulfilled' ? booksResult.value.count : 0,
-        papers: papersResult.status === 'fulfilled' ? papersResult.value.count : 0
+        bookshelf: booksResult.status === 'fulfilled' ? booksResult.value.count : null,
+        pubmed: papersResult.status === 'fulfilled' ? papersResult.value.count : null,
+        europepmc: europeResult.status === 'fulfilled' ? europeResult.value.count : null,
+        crossref: crossrefResult.status === 'fulfilled' ? crossrefResult.value.count : null
       }
     };
-    if (booksResult.status === 'rejected' && papersResult.status === 'rejected') throw new Error('NCBI search services are unavailable');
+    if (settled.every(result => result.status === 'rejected')) throw new Error('All literature search services are unavailable');
     onlineLibraryCache.set(cacheKey, { time: Date.now(), value });
     return res.json(value);
   } catch (error) {

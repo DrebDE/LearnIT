@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="LearnIT open book logo">
+  <rect width="128" height="128" rx="30" fill="#08765f"/>
+  <path d="M64 50c-9-7-20-10-33-8v43c13-2 24 1 33 8m0-43c9-7 20-10 33-8v43c-13-2-24-1-33 8m0-43v43" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="6"/>
+  <path d="M40 57c6 0 12 2 17 5M40 69c6 0 12 2 17 5m14-12c5-3 11-5 17-5m-17 17c5-3 11-5 17-5" fill="none" stroke="#bdebdc" stroke-linecap="round" stroke-width="4"/>
+  <path d="M96 19v18m-9-9h18" fill="none" stroke="#d5f6e9" stroke-linecap="round" stroke-width="5"/>
+</svg>
