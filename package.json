@@ -1,0 +1,14 @@
+{
+  "name": "medstudy-companion",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "dotenv": "^16.4.7",
+    "mammoth": "^1.9.0",
+    "pdf-parse": "^1.1.1",
+    "jszip": "^3.10.1"
+  }
+}
