@@ -228,9 +228,11 @@ app.post('/api/extract', express.raw({ type: 'application/octet-stream', limit: 
 app.post('/api/ai', async (req, res) => {
   if (!aiConfigured()) return res.status(503).json({ error: 'AI features need setup. Copy .env.example to .env and set AI_API_KEY and AI_MODEL.' });
   try {
+    const requestBody = { model: process.env.AI_MODEL, messages: req.body.messages, temperature: 0.3 };
+    if (req.body.response_format?.type === 'json_schema') requestBody.response_format = req.body.response_format;
     const response = await fetch(`${(process.env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')}/chat/completions`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.AI_API_KEY}` },
-      body: JSON.stringify({ model: process.env.AI_MODEL, messages: req.body.messages, temperature: 0.3 })
+      body: JSON.stringify(requestBody)
     });
     const responseText = await response.text();
     let body = {};
