@@ -264,3 +264,11 @@ initialize();
 
 const courseSearchPhrases={MLS:'"medical laboratory science" OR "clinical laboratory" OR "laboratory medicine"',Nursing:'"nursing care" OR "nursing practice" OR nurse',Psychology:'psychology OR psychological OR cognitive',Pharmacy:'pharmacy OR pharmacist OR pharmaceutical OR pharmacology OR pharmacotherapy'};
 document.addEventListener('click',event=>{const scoped=event.target.closest('[data-search-field]');if(scoped)searchFieldOverride=scoped.dataset.searchField||''},true);
+
+function setMobileNavOpen(open){const toggle=$('#mobileMenuToggle'),backdrop=$('#mobileNavBackdrop');if(!toggle||!backdrop)return;document.body.classList.toggle('mobile-nav-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Close navigation menu':'Open navigation menu');backdrop.hidden=!open;if(open)$('#mobileNavClose').focus();else toggle.focus({preventScroll:true})}
+$('#mobileMenuToggle').addEventListener('click',()=>setMobileNavOpen(!document.body.classList.contains('mobile-nav-open')));
+$('#mobileNavClose').addEventListener('click',()=>setMobileNavOpen(false));
+$('#mobileNavBackdrop').addEventListener('click',()=>setMobileNavOpen(false));
+$$('#mainNav a').forEach(link=>link.addEventListener('click',()=>setMobileNavOpen(false)));
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('mobile-nav-open'))setMobileNavOpen(false)});
+window.addEventListener('resize',()=>{if(window.innerWidth>900&&document.body.classList.contains('mobile-nav-open'))setMobileNavOpen(false)});
