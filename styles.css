@@ -391,3 +391,14 @@ footer{border-color:var(--line);font-family:Inter,Arial,sans-serif;font-size:10p
 .bundle-counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.bundle-counts .flashcard-count{align-items:flex-start;flex-direction:column;margin:16px 0 4px}.bundle-counts .flashcard-count input{width:min(100%,160px)}
 @media(max-width:560px){.bundle-counts{grid-template-columns:1fr;gap:0}.bundle-counts .flashcard-count input{width:100%}}
 @media print{@page{margin:18mm}body.printing-reviewer{background:#fff!important;color:#111!important}body.printing-reviewer *{visibility:hidden!important}body.printing-reviewer #reviewerOutput,body.printing-reviewer #reviewerOutput *{visibility:visible!important}body.printing-reviewer #reviewerOutput{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;color:#111!important}body.printing-reviewer #reviewerOutput h2{font-size:22pt;color:#111!important}body.printing-reviewer #reviewerOutput .output-body{white-space:pre-wrap;line-height:1.55;font-size:10.5pt;color:#111!important}body.printing-reviewer #reviewerOutput .hint,body.printing-reviewer #reviewerOutput .output-actions{display:none!important}body.printing-reviewer a{color:#111!important}}.reviewer-rich h3{font:600 1.12rem/1.35 var(--sans,inherit);margin:1.6em 0 .55em;color:var(--text)}.reviewer-rich p{margin:.65em 0;line-height:1.75}.reviewer-rich ul,.reviewer-rich ol{padding-left:1.5rem;line-height:1.7}.reviewer-rich li{padding:.16em 0}.reviewer-rich code{padding:.08em .25em;border-radius:4px;background:var(--surface2)}
+/* Render Lumi's Markdown as readable study notes instead of showing syntax marks. */
+.lumi-chat-content{color:var(--text);font-size:14px;line-height:1.7;overflow-wrap:anywhere}
+.lumi-chat-content p{margin:0 0 .75rem;color:inherit;font-size:inherit;line-height:inherit;white-space:normal}
+.lumi-chat-content p:last-child{margin-bottom:0}
+.lumi-chat-content h3{margin:1rem 0 .45rem;color:var(--text);font:700 1rem/1.35 Manrope,sans-serif;letter-spacing:-.02em}
+.lumi-chat-content h3:first-child{margin-top:0}
+.lumi-chat-content ul,.lumi-chat-content ol{margin:.35rem 0 .85rem;padding-left:1.35rem;line-height:1.65}
+.lumi-chat-content li{padding:.12rem 0}
+.lumi-chat-content blockquote{margin:.65rem 0;padding:.2rem .8rem;border-left:3px solid var(--brand);background:var(--surface2);color:var(--muted)}
+.lumi-chat-content strong{color:var(--text);font-weight:700}
+.lumi-chat-content code,.reviewer-rich code{padding:.08em .28em;border-radius:4px;background:var(--surface2);font:.92em ui-monospace,Consolas,monospace}
