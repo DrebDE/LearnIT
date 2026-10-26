@@ -232,9 +232,23 @@ app.post('/api/ai', async (req, res) => {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.AI_API_KEY}` },
       body: JSON.stringify({ model: process.env.AI_MODEL, messages: req.body.messages, temperature: 0.3 })
     });
-    const body = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: body.error?.message || 'AI provider request failed.' });
-    res.json({ text: body.choices?.[0]?.message?.content || '' });
+    const responseText = await response.text();
+    let body = {};
+    try { body = JSON.parse(responseText); } catch {}
+    if (!response.ok) {
+      const providerMessage = body.error?.message || body.error_description || body.message || (typeof body.error === 'string' ? body.error : '');
+      const message = providerMessage
+        ? `AI provider returned HTTP ${response.status}: ${providerMessage}`
+        : `AI provider returned HTTP ${response.status} for model ${process.env.AI_MODEL}. Check the model name, API key, base URL, and provider quota.`;
+      console.error(`[AI] Upstream request rejected: HTTP ${response.status}, model ${process.env.AI_MODEL}`);
+      return res.status(response.status).json({ error: message });
+    }
+    const text = body.choices?.[0]?.message?.content;
+    if (typeof text !== 'string' || !text.trim()) {
+      console.error(`[AI] Empty or unsupported response format, model ${process.env.AI_MODEL}`);
+      return res.status(502).json({ error: `The AI provider returned no usable text for model ${process.env.AI_MODEL}. Check model compatibility and try again.` });
+    }
+    res.json({ text });
   } catch (e) { res.status(502).json({ error: `AI request failed: ${e.message}` }); }
 });
 
