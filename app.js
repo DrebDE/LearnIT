@@ -55,7 +55,7 @@ function navigate(page){if(!hasActiveAuthSession()&&!guestAccess){showLoginGate(
 function appendLumiMessage(role,content){
   const list=$('#lumiChatMessages');if(!list)return;
   const message=document.createElement('article');message.className='lumi-chat-message '+(role==='user'?'user':'assistant');
-  if(role!=='user'){const avatar=document.createElement('span');avatar.className='lumi-chat-avatar';const image=document.createElement('img');image.src='/learnit-logo.svg';image.alt='';avatar.append(image);message.append(avatar)}
+  if(role!=='user'){const avatar=document.createElement('span');avatar.className='lumi-chat-avatar';const image=document.createElement('img');image.src='/lumi-face.svg';image.alt='';avatar.append(image);message.append(avatar)}
   const bubble=document.createElement('div');bubble.className='lumi-chat-bubble';const speaker=document.createElement('b');speaker.className='lumi-chat-speaker';speaker.textContent=role==='user'?'You':'Lumi';
   const body=document.createElement(role==='user'?'p':'div');body.className=role==='user'?'lumi-chat-user-text':'lumi-chat-content';
   if(role==='user')body.textContent=content;else body.innerHTML=reviewerMarkup(content);

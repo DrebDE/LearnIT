@@ -137,7 +137,7 @@ h1{line-height:1.02}.top{background:var(--surface);border-bottom:1px solid var(-
 .lumi-chat-panel{max-width:900px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;overflow:hidden}
 .lumi-chat-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 19px;border-bottom:1px solid var(--line)}
 .lumi-chat-identity{display:flex;align-items:center;gap:11px}
-.lumi-chat-brandmark{display:grid;place-items:center;width:38px;height:38px;overflow:hidden;border-radius:5px;background:var(--brand)}
+.lumi-chat-brandmark{display:grid;place-items:center;width:42px;height:42px;overflow:hidden;border-radius:50%;background:var(--surface2);border:1px solid var(--line)}
 .lumi-chat-brandmark img{display:block;width:100%;height:100%}
 .lumi-chat-identity b,.lumi-chat-identity small{display:block}
 .lumi-chat-identity b{font-size:14px}
@@ -146,7 +146,7 @@ h1{line-height:1.02}.top{background:var(--surface);border-bottom:1px solid var(-
 .lumi-chat-messages{display:flex;flex-direction:column;gap:16px;min-height:340px;max-height:min(58vh,640px);overflow-y:auto;padding:22px;background:var(--bg);scroll-behavior:smooth}
 .lumi-chat-message{display:flex;align-items:flex-start;gap:9px;max-width:86%}
 .lumi-chat-message.user{align-self:flex-end;justify-content:flex-end}
-.lumi-chat-avatar{flex:none;width:28px;height:28px;overflow:hidden;border-radius:4px;background:var(--brand)}
+.lumi-chat-avatar{flex:none;width:34px;height:34px;overflow:hidden;border-radius:50%;background:var(--surface2);border:1px solid var(--line)}
 .lumi-chat-avatar img{display:block;width:100%;height:100%}
 .lumi-chat-bubble{max-width:100%;padding:11px 14px;background:var(--surface);border:1px solid var(--line);border-radius:4px}
 .lumi-chat-message.user .lumi-chat-bubble{background:var(--brand2);border-color:transparent}
