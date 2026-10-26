@@ -14,6 +14,8 @@ The course-topic sources appear on the Courses page. They include CHED CMO No. 1
 2. In this directory, run `npm install`.
 3. Run `npm start`, then open `http://localhost:3000`.
 
+Ask Lumi provides an in-app chat for course questions and short explanations. Conversation history stays in that browser and is sent to the site owner's configured AI provider; users can clear it at any time. Avoid sharing patient information or other private data.
+
 Lumi, your LearnIT study buddy, extracts PDF, DOCX, PPTX, and TXT uploads. Choose 1–50 flashcards; one AI generation creates a structured reviewer, a plain-language guide, a comparison against selected-field curriculum suggestions, fresh flashcards, and an 8-question challenging quiz. Regenerating replaces the deck with a new set. The browser adds no separate file-size cap; the extraction server accepts a request up to 100 MB, and hosting memory and AI model limits may be lower in practice. After generation, the upload becomes a named deck with its reviewer, flashcards, quiz, and locally saved review progress. Decks and extracted text are saved in IndexedDB on that device so they can be reopened in My decks. They are not synchronized across devices or stored by LearnIT on its server. Extracted text is sent to the AI provider configured by the site owner. Do not upload patient information or other private data.
 
 ## Deploy on Render

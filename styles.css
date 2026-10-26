@@ -128,3 +128,39 @@ h1{line-height:1.02}.top{background:var(--surface);border-bottom:1px solid var(-
 @media(max-width:930px){.deck-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.top nav{gap:4px}.top nav a{padding:8px 9px}}
 @media(max-width:760px){.login-card{grid-template-columns:1fr;width:min(100%,600px)}.login-aside{min-height:auto;gap:26px;padding:22px 25px}.login-note h2{font-size:2.5rem}.login-aside-foot{display:none}.login-form-panel{padding:32px 25px}.deck-grid{grid-template-columns:1fr 1fr}.deck-cover{min-height:170px}}
 @media(max-width:540px){.login-aside{padding:18px 20px}.login-note{display:none}.login-form-panel{padding:26px 20px}.auth-social-group{grid-template-columns:1fr}.login-card h1{font-size:2.5rem}.deck-grid{grid-template-columns:1fr}.deck-cover{min-height:180px}.deck-library-toolbar{align-items:flex-start;flex-direction:column}.history-deck-cta{align-items:flex-start;flex-direction:column}.deck-study-progress{justify-items:start}}
+
+/* Lumi chat */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.lumi-chat-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;max-width:none}
+.lumi-chat-heading>div{max-width:690px}
+.lumi-chat-heading .secondary{flex:none;white-space:nowrap;border-radius:3px}
+.lumi-chat-panel{max-width:900px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.lumi-chat-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 19px;border-bottom:1px solid var(--line)}
+.lumi-chat-identity{display:flex;align-items:center;gap:11px}
+.lumi-chat-brandmark{display:grid;place-items:center;width:38px;height:38px;overflow:hidden;border-radius:5px;background:var(--brand)}
+.lumi-chat-brandmark img{display:block;width:100%;height:100%}
+.lumi-chat-identity b,.lumi-chat-identity small{display:block}
+.lumi-chat-identity b{font-size:14px}
+.lumi-chat-identity small{color:var(--muted);font-size:10px}
+.lumi-chat-topbar button{flex:none;font-size:12px}
+.lumi-chat-messages{display:flex;flex-direction:column;gap:16px;min-height:340px;max-height:min(58vh,640px);overflow-y:auto;padding:22px;background:var(--bg);scroll-behavior:smooth}
+.lumi-chat-message{display:flex;align-items:flex-start;gap:9px;max-width:86%}
+.lumi-chat-message.user{align-self:flex-end;justify-content:flex-end}
+.lumi-chat-avatar{flex:none;width:28px;height:28px;overflow:hidden;border-radius:4px;background:var(--brand)}
+.lumi-chat-avatar img{display:block;width:100%;height:100%}
+.lumi-chat-bubble{max-width:100%;padding:11px 14px;background:var(--surface);border:1px solid var(--line);border-radius:4px}
+.lumi-chat-message.user .lumi-chat-bubble{background:var(--brand2);border-color:transparent}
+.lumi-chat-speaker{display:block;margin:0 0 4px;color:var(--brand);font-size:10px;letter-spacing:.04em}
+.lumi-chat-bubble p{margin:0;color:var(--text);font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.lumi-chat-prompts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:13px 18px 2px}
+.lumi-chat-prompts>span{margin-right:3px;color:var(--muted);font-size:10px;font-weight:700}
+.lumi-chat-prompts button{padding:6px 10px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--text);font-size:10px;cursor:pointer}
+.lumi-chat-prompts button:hover{border-color:var(--brand);color:var(--link)}
+.lumi-chat-composer{display:grid;grid-template-columns:1fr auto;align-items:end;gap:10px;padding:14px 18px 0}
+.lumi-chat-composer textarea{width:100%;min-height:54px;max-height:180px;resize:vertical;padding:11px 12px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--text);font:inherit;font-size:13px;line-height:1.5}
+.lumi-chat-composer textarea:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.lumi-chat-composer button{min-width:82px;min-height:44px;padding:10px 15px;border-radius:3px}
+.lumi-chat-composer button:disabled{opacity:.55;cursor:wait}
+.lumi-chat-status{min-height:18px;margin:6px 18px 0;color:var(--muted);font-size:11px}
+.lumi-chat-note{margin:0;padding:0 18px 15px;color:var(--muted);font-size:10px;line-height:1.5}
+@media(max-width:600px){.lumi-chat-heading{align-items:flex-start;flex-direction:column;gap:10px}.lumi-chat-messages{min-height:300px;max-height:56vh;padding:15px}.lumi-chat-message{max-width:94%}.lumi-chat-prompts{align-items:flex-start}.lumi-chat-prompts>span{width:100%}.lumi-chat-prompts button{font-size:9px}.lumi-chat-composer{grid-template-columns:1fr;padding-left:14px;padding-right:14px}.lumi-chat-composer button{justify-self:end}.lumi-chat-status,.lumi-chat-note{margin-left:14px;margin-right:14px}}
