@@ -337,3 +337,25 @@ footer{border-color:var(--line);font-family:Inter,Arial,sans-serif;font-size:10p
   .hero-note{max-width:260px}
   .page-heading{max-width:100%}
 }
+/* Active-recall and multiple-choice flashcard practice */
+.card-practice{display:grid;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.card-practice-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.card-practice-toolbar label{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px;font-weight:600}
+.card-practice-toolbar select{min-height:36px;max-width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--text);font:inherit}
+.card-practice-toolbar>span{color:var(--muted);font-size:11px}
+.card-typed-form{display:grid;gap:8px}
+.card-typed-form label{font-size:12px;font-weight:600;color:var(--text)}
+.card-typed-form textarea{width:100%;min-height:78px;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--text);font:inherit;font-size:13px;resize:vertical}
+.card-typed-form textarea:focus-visible,.card-practice-toolbar select:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.card-typed-form button{justify-self:start;min-height:38px;padding:8px 13px}
+.card-choice-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card-choice{min-height:48px;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--surface2);color:var(--text);font:inherit;font-size:13px;line-height:1.45;text-align:left;cursor:pointer}
+.card-choice:hover:not(:disabled){border-color:var(--brand);background:var(--brand2)}
+.card-choice:disabled{cursor:default}
+.card-choice.is-correct{border-color:var(--brand);background:var(--brand2);font-weight:700}
+.card-choice.is-incorrect{border-color:#c65d5d;background:rgba(198,93,93,.1)}
+.card-practice-feedback{min-height:0;margin:0;font-size:12px}
+.card-practice-feedback:empty{display:none}
+.card-practice-answer{padding:11px 13px;border-left:3px solid var(--brand);border-radius:3px;background:var(--surface2);color:var(--text);font-size:13px;line-height:1.6;white-space:pre-wrap}
+.card-reveal-button{justify-self:start;padding:4px 0;font-size:12px}
+@media(max-width:600px){.card-choice-list{grid-template-columns:1fr}.card-practice-toolbar{align-items:flex-start;flex-direction:column}.card-practice-toolbar label{align-items:flex-start;flex-direction:column;gap:5px}.card-practice-toolbar select{width:100%}.card-choice{min-height:44px}}
