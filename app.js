@@ -171,12 +171,18 @@ async function signOut(){
   try{
     const userContent=extra+'\n\nUploaded study material:\n'+source;
     let response,data;
-    for(let attempt=0;attempt<2;attempt++){
+    const retryableStatuses=new Set([408,429,500,502,503,504]);
+    for(let attempt=0;attempt<5;attempt++){
       response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'system',content:system},{role:'user',content:userContent}]})});
-      data=await response.json();
-      if(response.status!==503||attempt===1)break;
-      $('#fileStatus').textContent='Lumi’s AI provider is busy. Retrying once…';
-      await new Promise(resolve=>setTimeout(resolve,1800));
+      data=await response.json().catch(()=>({}));
+      const providerError=String(data.error||'').toLowerCase();
+      const setupIssue=/ai features need setup|not configured/.test(providerError);
+      const dailyQuota=response.status===429&&/(daily|per day|per-day)/.test(providerError);
+      if(response.ok||!retryableStatuses.has(response.status)||attempt===4||setupIssue||dailyQuota)break;
+      const retryAfter=Number(response.headers.get('retry-after'));
+      const waitMs=Number.isFinite(retryAfter)&&retryAfter>0?Math.min(30000,retryAfter*1000):Math.min(16000,1000*(2**attempt));
+      $('#fileStatus').textContent='Lumi’s AI provider is temporarily unavailable (HTTP '+response.status+'). Retrying in '+Math.ceil(waitMs/1000)+' seconds ('+(attempt+1)+' of 4)…';
+      await new Promise(resolve=>setTimeout(resolve,waitMs));
     }
     if(!response.ok)throw Error(data.error||'AI feature unavailable');
     return data.text;
