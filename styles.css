@@ -386,3 +386,4 @@ footer{border-color:var(--line);font-family:Inter,Arial,sans-serif;font-size:10p
 .legal-note{margin:0;text-align:center;font-size:11px!important;line-height:1.55}
 .login-legal-links{display:flex;justify-content:center;gap:14px;margin:0;font-size:11px}
 @media(max-width:600px){.legal-header-inner{padding:12px 16px}.legal-main{padding:22px 14px 44px}.legal-article{padding:22px 18px}.legal-article section p,.legal-article li{font-size:13px}.legal-footer-links{width:100%}}
+@media(max-width:900px){body.mobile-nav-open .top{z-index:70}}
