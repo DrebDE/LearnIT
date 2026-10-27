@@ -38,6 +38,18 @@ Do not put a Supabase service_role key in the website or browser. Once these val
 In Supabase, open Authentication > Sign In / Providers and enable Google and Facebook with credentials from their respective developer consoles. Add the exact callback URL shown by Supabase (https://<project-ref>.supabase.co/auth/v1/callback) to each provider app. Set the Supabase Site URL to the LearnIT Render origin and add the production and local app origins to its redirect URL allow list. Facebook also requires email permission; people outside the app's tester roles may not be able to sign in until the Facebook app is available to them.
 
 LearnIT starts the OAuth flow with Supabase Auth and returns to the app origin. The social buttons remain unavailable until the public Supabase URL and anon key are configured. Provider client IDs and secrets belong in Supabase, never in Render frontend variables or the repository.
+## Login protection and guardrails
+
+Create a Cloudflare Turnstile widget for the LearnIT hostname medstudy-ru0u.onrender.com, then add both values to the Render service environment:
+
+- TURNSTILE_SITE_KEY: the public site key
+- TURNSTILE_SECRET_KEY: the private secret key; keep it in Render and out of Git
+
+LearnIT displays the widget on the login page and verifies its single-use token on the server. A verified browser session lasts 12 hours. The server also rate-limits all API routes (120 requests per minute per IP), with tighter limits for email sign-in (8 per 15 minutes), searches (30 per minute), uploads (4 per 15 minutes), AI requests (60 per minute and 300 per hour), and account session actions. If both Turnstile variables are missing, the app remains usable with rate limits but the Cloudflare check is inactive; configure both keys to enable it. If only one key is set, protected features pause until both are supplied.
+
+Rate-limit counters are stored in the Node process memory, so they reset when Render restarts the service and are not shared across multiple instances. For Lumi, the server adds its own education-only safety instructions, demotes client-supplied prompt instructions to task context, limits message sizes, and treats uploaded documents as untrusted content. These protections reduce risk but cannot guarantee every AI response is safe or accurate.
+
+The login, Google/Facebook, and guest options require users to check a box agreeing to the Terms & Conditions and acknowledging the Privacy Policy. Email authentication is rate-limited through the LearnIT server before it reaches Supabase.
 ## Enable Lumi
 
 On Render, configure `AI_API_KEY` and `AI_MODEL` for an OpenAI-compatible chat-completions provider. `AI_BASE_URL` is optional and defaults to the OpenAI API base URL. Keep provider secrets out of Git. Lumi checks setup before sending uploaded text to a model and reports clearly when it is not configured.
@@ -45,3 +57,4 @@ On Render, configure `AI_API_KEY` and `AI_MODEL` for an OpenAI-compatible chat-c
 ## Learning references
 
 Curriculum suggestions are grounded in the official and university sources linked in the app. Online study searches return bibliographic metadata and source links. LearnIT is educational support, not clinical guidance. Verify changing recommendations against current authoritative sources and your instructors' materials.
+

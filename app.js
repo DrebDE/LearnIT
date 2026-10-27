@@ -23,6 +23,7 @@ const removeSessionValue=k=>{try{sessionStorage.removeItem(k)}catch{}};
 const loadLumiChat=()=>{const value=get('learnit-lumi-chat',[]);return Array.isArray(value)?value.filter(item=>item&&['user','assistant'].includes(item.role)&&typeof item.content==='string').slice(-40):[]};
 let prefs=get('ms-prefs',null), history=[], currentTopic=null, currentMaterial='', currentFile='', currentDeckTitle='', uploadedText='', currentCards=[], cardIndex=0, currentQuiz=[], sessionReviewers={}, toolReturnPage='home', currentSearchResults=[], activeSearchFilter='All results', bundleCardIndex=0, bundleCardRevealed=false, bundleKnown=0, bundleReviewAgain=0, currentSearchTerm='', currentSearchFields=[], searchFieldOverride='', currentCardSource='', currentCardTitle='', currentCardCount=10;
 let authConfig={authConfigured:false,supabaseUrl:'',supabaseAnonKey:''},authSession=get('learnit-auth',null),guestAccess=getSessionValue('learnit-guest')==='true',accountMode='login';
+let securityConfig={turnstileConfigured:false,turnstileSetupPending:false,turnstileSiteKey:''},turnstileToken='',turnstileWidgetId=null,securityTicketRequest=null,securityRefreshOnly=false,securityResumeGuest=false;
 let savedMaterials=[],currentKnownCards=[],socialAuthClient=null,currentMaterialId='',currentBundle=null,currentBundleQuiz=[];
 let lumiChatMessages=loadLumiChat(),lumiChatBusy=false;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -46,7 +47,7 @@ function mergeResults(results){const byKey=new Map();for(const item of results){
 function renderResultFilters(){const options=['All results','Books & chapters','Research articles','Open access'];$('#resultFilters').innerHTML=options.map(name=>`<button class="chip ${activeSearchFilter===name?'active':''}" type="button" data-result-filter="${esc(name)}">${esc(name)}</button>`).join('')}
 function renderResultCards(){const selected=currentSearchResults.filter(r=>activeSearchFilter==='All results'||activeSearchFilter==='Books & chapters'&&r.type.toLowerCase().includes('book')||activeSearchFilter==='Research articles'&&r.type.toLowerCase().includes('article')||activeSearchFilter==='Open access'&&r.fullText);$('#searchResultList').innerHTML=selected.length?selected.map(r=>{const meta=[r.authors?.join(', '),r.venue,r.year].filter(Boolean).map(esc).join(' · ');const sources=(r.providers||[r.provider]).map(esc).join(' · ');const link=safeHref(r.url);const fullText=r.fullText&&safeHref(r.fullText)!=='#'?`<a class="result-fulltext" href="${safeHref(r.fullText)}">Open free full text</a>`:'';return `<article class="search-result-card"><div class="result-labels"><span class="tag">${sources}</span><span class="result-type">${esc(r.type)}</span></div><h3><a href="${link}">${esc(r.title)}</a></h3>${meta?`<p class="result-meta">${meta}</p>`:''}${r.snippet?`<p class="result-snippet">${esc(r.snippet)}</p>`:''}<div class="result-actions"><a href="${link}">Open record</a>${fullText}</div></article>`}).join(''):`<div class="empty">No records passed both the topic and ${esc(currentSearchFields.join(', '))} relevance filters for “${esc(currentSearchTerm)}”. Try a more specific phrase or change your course in Settings.</div>`}
 function renderSearchResults(data,term){currentSearchResults=mergeResults(data.results||[]);const errors=Object.values(data.errors||{}).filter(Boolean);const scope=currentSearchFields.join(', ');$('#searchStatus').textContent=`${currentSearchResults.length} relevant result cards for “${term}” in ${scope}, filtered by topic match and course relevance.${errors.length?` Some sources did not respond: ${errors.join(' ')}`:''}`;activeSearchFilter='All results';renderResultFilters();renderResultCards()}
-async function runSearch(q,scopeOverride=''){const term=q.trim();if(!term){search('');return}const scope=scopeOverride?[scopeOverride]:(searchFieldOverride?[searchFieldOverride]:searchFields());searchFieldOverride='';currentSearchTerm=term;currentSearchFields=scope;renderHome(localSearch(term,scope),term);$('#researchSection').hidden=false;$('#searchResultsTitle').textContent=`Results for “${term}” · ${scope.join(', ')}` ;$('#searchStatus').textContent=`Searching scholarly sources for ${scope.join(', ')}…` ;$('#sourceSearchLinks').innerHTML=resourceSearchMarkup(term,scope);$('#searchResultList').innerHTML='<div class="empty" aria-live="polite">Searching the selected course’s reference sources…</div>';$('#resultFilters').innerHTML='';$('#researchSection').scrollIntoView({behavior:'smooth',block:'start'});try{const params=new URLSearchParams({q:term,fields:scope.join(',')});const response=await fetch(`/api/search?${params}`);const data=await response.json();if(!response.ok)throw Error(data.error||'The library search is unavailable.');renderSearchResults(data,term)}catch(error){currentSearchResults=[];$('#searchStatus').textContent=`LearnIT could not reach the course-filtered scholarly indexes: ${error.message}`;$('#searchResultList').innerHTML='<div class="empty">Try again in a moment, or use one of the course-filtered source cards above.</div>'}}
+async function runSearch(q,scopeOverride=''){const term=q.trim();if(!term){search('');return}const scope=scopeOverride?[scopeOverride]:(searchFieldOverride?[searchFieldOverride]:searchFields());searchFieldOverride='';currentSearchTerm=term;currentSearchFields=scope;renderHome(localSearch(term,scope),term);$('#researchSection').hidden=false;$('#searchResultsTitle').textContent=`Results for “${term}” · ${scope.join(', ')}` ;$('#searchStatus').textContent=`Searching scholarly sources for ${scope.join(', ')}…` ;$('#sourceSearchLinks').innerHTML=resourceSearchMarkup(term,scope);$('#searchResultList').innerHTML='<div class="empty" aria-live="polite">Searching the selected course’s reference sources…</div>';$('#resultFilters').innerHTML='';$('#researchSection').scrollIntoView({behavior:'smooth',block:'start'});try{await ensureSecurityTicket();const params=new URLSearchParams({q:term,fields:scope.join(',')});const response=await fetch(`/api/search?${params}`);const data=await response.json();if(!response.ok)throw Error(data.error||'The library search is unavailable.');renderSearchResults(data,term)}catch(error){currentSearchResults=[];$('#searchStatus').textContent=`LearnIT could not reach the course-filtered scholarly indexes: ${error.message}`;$('#searchResultList').innerHTML='<div class="empty">Try again in a moment, or use one of the course-filtered source cards above.</div>'}}
 let activeSubject='All';
 function programCard(program){const suggestions=curriculumSuggestions.filter(topic=>topic.field===program.field);return `<article class="program-card"><div class="program-card-heading"><span class="tag">${esc(program.basis)}</span><h2>${esc(program.field)}</h2><p><b>${esc(program.degree)}</b></p><p>${esc(program.description)}</p></div><h3>Suggested topics</h3><div class="program-topic-list">${suggestions.map(topic=>`<button type="button" class="program-topic" data-search-topic="${esc(topic.query)}" data-search-field="${esc(program.field)}"><span>${esc(topic.title)}</span><small>Search sources →</small></button>`).join('')}</div><div class="program-sources"><b>Curriculum references</b>${program.sources.map(source=>`<a href="${safeHref(source.url)}">${esc(source.label)}</a>`).join('')}</div></article>`}
 function renderSubjects(filter=activeSubject){activeSubject=filter;$('#subjectFilters').innerHTML=['All',...fields].map(field=>`<button class="chip ${filter===field?'active':''}" type="button" data-filter="${esc(field)}">${esc(field)}</button>`).join('');const visible=programs.filter(program=>filter==='All'||program.field===filter);$('#allTopics').innerHTML=visible.length?visible.map(programCard).join(''):'<div class="empty">No course topic suggestions found.</div>'}
@@ -64,7 +65,7 @@ function appendLumiMessage(role,content){
 function renderLumiChat(){const list=$('#lumiChatMessages');if(!list)return;list.replaceChildren();$('#lumiChatFieldContext').textContent='Course focus: '+(selectedFields().join(', ')||(prefs?.exploring?'all fields':'your selected course'));if(lumiChatMessages.length)lumiChatMessages.forEach(message=>appendLumiMessage(message.role,message.content));else appendLumiMessage('assistant','Hi, I’m Lumi. Ask me to explain a course concept, compare two ideas, or help you practice. What are you studying today?');list.scrollTop=list.scrollHeight}
 function saveLumiChatMessage(role,content){lumiChatMessages.push({role,content});lumiChatMessages=lumiChatMessages.slice(-40);try{localStorage.setItem('learnit-lumi-chat',JSON.stringify(lumiChatMessages))}catch{}renderLumiChat()}
 function clearLumiChat(){if(lumiChatBusy){$('#lumiChatStatus').textContent='Wait for Lumi to finish before clearing the conversation.';return}lumiChatMessages=[];try{localStorage.removeItem('learnit-lumi-chat')}catch{}$('#lumiChatStatus').textContent='';renderLumiChat()}
-async function submitLumiChat(event){event.preventDefault();if(lumiChatBusy)return;const input=$('#lumiChatInput'),status=$('#lumiChatStatus'),send=$('#lumiChatSend'),message=input.value.trim();if(!message)return;if(message.length>3000){status.textContent='Keep each message under 3,000 characters.';return}status.textContent='';saveLumiChatMessage('user',message);input.value='';lumiChatBusy=true;input.disabled=true;send.disabled=true;$('#clearLumiChat').disabled=true;send.textContent='Thinking…';status.textContent='Lumi is thinking…';try{const response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'system',content:'You are Lumi, LearnIT’s careful study buddy for MLS, Nursing, Psychology, and Pharmacy learners. The learner’s current course focus is '+(selectedFields().join(', ')||(prefs?.exploring?'all fields':'health-science courses'))+'. Explain concepts clearly, help compare ideas, use short examples, and support active recall. Prefer concise, readable answers. Ask a brief clarifying question when needed. Be honest about uncertainty; never invent facts, studies, or citations. This is educational support, not clinical advice: do not diagnose, prescribe, or recommend treatment for a specific person. If asked for sources, do not fabricate citations; direct the learner to search the LearnIT library.'},...lumiChatMessages.slice(-20).map(({role,content})=>({role,content}))]})});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||'Lumi could not reply just now. Please try again.');if(typeof data.text!=='string'||!data.text.trim())throw Error('Lumi returned an empty reply. Please try again.');saveLumiChatMessage('assistant',data.text.trim());status.textContent=''}catch(error){status.textContent=error.message||'Lumi could not reply just now. Please try again.'}finally{lumiChatBusy=false;input.disabled=false;send.disabled=false;$('#clearLumiChat').disabled=false;send.textContent='Send';input.focus()}}
+async function submitLumiChat(event){event.preventDefault();if(lumiChatBusy)return;const input=$('#lumiChatInput'),status=$('#lumiChatStatus'),send=$('#lumiChatSend'),message=input.value.trim();if(!message)return;if(message.length>3000){status.textContent='Keep each message under 3,000 characters.';return}status.textContent='';saveLumiChatMessage('user',message);input.value='';lumiChatBusy=true;input.disabled=true;send.disabled=true;$('#clearLumiChat').disabled=true;send.textContent='Thinking…';status.textContent='Lumi is thinking…';try{await ensureSecurityTicket();const response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'system',content:'You are Lumi, LearnIT’s careful study buddy for MLS, Nursing, Psychology, and Pharmacy learners. The learner’s current course focus is '+(selectedFields().join(', ')||(prefs?.exploring?'all fields':'health-science courses'))+'. Explain concepts clearly, help compare ideas, use short examples, and support active recall. Prefer concise, readable answers. Ask a brief clarifying question when needed. Be honest about uncertainty; never invent facts, studies, or citations. This is educational support, not clinical advice: do not diagnose, prescribe, or recommend treatment for a specific person. If asked for sources, do not fabricate citations; direct the learner to search the LearnIT library.'},...lumiChatMessages.slice(-20).map(({role,content})=>({role,content}))]})});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||'Lumi could not reply just now. Please try again.');if(typeof data.text!=='string'||!data.text.trim())throw Error('Lumi returned an empty reply. Please try again.');saveLumiChatMessage('assistant',data.text.trim());status.textContent=''}catch(error){status.textContent=error.message||'Lumi could not reply just now. Please try again.'}finally{lumiChatBusy=false;input.disabled=false;send.disabled=false;$('#clearLumiChat').disabled=false;send.textContent='Send';input.focus()}}
 function sourceMarkup(t){return `<h2>References</h2><div class="sources">${(t.sources||[]).map(x=>`<p><b>${esc(x[0])}</b><br>${esc(x[1])} · ${esc(x[2])}<br><a href="${esc(x[3])}">Open source</a></p>`).join('')}</div>`}
 function openTopic(id){const t=topics.find(x=>x.id===id);if(!t)return;currentTopic=t;const s=t.sections;$('#studyContent').innerHTML=`<span class="tag">${esc(t.field)} · STUDY GUIDE</span><h1>${esc(t.title)}</h1><p class="lede">${esc(t.description)}</p><h2>Overview & definition</h2><p>${esc(s.overview)}</p><h2>History & development</h2><p>${esc(s.history)}</p><h2>Key concepts & terminology</h2><p>${esc(s.concepts)}</p><h2>Core principles & processes</h2><p>${esc(s.process)}</p><h2>Practical significance</h2><p>${esc(s.significance)}</p><h2>Limitations & sources of error</h2><p>${esc(s.limitations)}</p><h2>Quick recap</h2><p>${esc(s.recap)}</p>${sourceMarkup(t)}<div class="study-buttons"><button class="primary" data-tool="quiz">Create a mock quiz</button><button class="secondary" data-tool="cards">Make flashcards</button></div>`;addHistory({type:'topic',id,title:t.title,field:t.field});navigate('study')}
 function libraryUserId(){return hasActiveAuthSession()?String(authSession.user?.id||''):''}
@@ -118,8 +119,56 @@ function renderHistory(){
   if(currentCards.length)renderBuddyCards();if(currentBundleQuiz.length)renderHardQuiz();
 }
 async function openDeck(id,mode='cards'){try{await openSavedMaterial(id);const item=savedMaterials.find(record=>record.id===id),target=mode==='reviewer'?'#reviewerOutput':'#flashcardOutput';if(!item)throw Error('This deck is not available in the current user library.');document.querySelector(target)?.scrollIntoView({behavior:'smooth',block:'start'})}catch(error){toast(error.message||'Could not open this saved deck.')}}function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800)}
-async function initializeAuth(){
-  try{const response=await fetch('/api/config');if(response.ok)authConfig=await response.json()}catch{}
+const legalConsentVersion='2026-10-27';
+function hasLegalConsent(){return localStorage.getItem('learnit-legal-consent')===legalConsentVersion}
+function saveLegalConsent(){localStorage.setItem('learnit-legal-consent',legalConsentVersion)}
+function requireLegalConsent(input,status){if(input?.checked)return true;status.textContent='Please agree to the Terms & Conditions and acknowledge the Privacy Policy before continuing.';input?.focus();return false}
+async function initializeTurnstile(){
+  const status=$('#turnstileStatus');
+  if(!securityConfig.turnstileConfigured){
+    status.textContent=securityConfig.turnstileSetupPending?'Cloudflare verification setup is incomplete. The site owner must add both Turnstile keys in Render.':'Bot verification is not configured yet. LearnIT request limits are active.';
+    return;
+  }
+  status.textContent='Loading Cloudflare security check…';
+  try{
+    if(!window.turnstile){
+      await new Promise((resolve,reject)=>{
+        let script=document.querySelector('script[data-learnit-turnstile]');
+        if(!script){script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;script.defer=true;script.dataset.learnitTurnstile='true';document.head.appendChild(script)}
+        script.addEventListener('load',resolve,{once:true});script.addEventListener('error',()=>reject(new Error('Cloudflare security check could not load.')),{once:true});
+        if(window.turnstile)resolve();
+      });
+    }
+    if(!window.turnstile)throw new Error('Cloudflare security check could not load.');
+    turnstileWidgetId=window.turnstile.render('#loginTurnstile',{sitekey:securityConfig.turnstileSiteKey,action:'learnit_access',callback(token){turnstileToken=token;status.textContent='Security check complete.'},'expired-callback'(){turnstileToken='';status.textContent='Security check expired. Complete it again.'},'error-callback'(){turnstileToken='';status.textContent='Cloudflare could not complete the security check. Reload and try again.'}});
+    status.textContent='Complete the Cloudflare check to continue.';
+  }catch(error){status.textContent=error.message||'Cloudflare security check could not load.'}
+}
+async function ensureSecurityTicket(){
+  if(securityConfig.turnstileSetupPending)throw new Error('Cloudflare verification is partly configured. The site owner must add both Turnstile keys in Render.');
+  if(!securityConfig.turnstileConfigured)return true;
+  if(!hasLegalConsent())throw new Error('Please accept the Terms & Conditions and acknowledge the Privacy Policy first.');
+  if(securityTicketRequest)return securityTicketRequest;
+  securityTicketRequest=(async()=>{
+    const current=await fetch('/api/security/status');
+    const currentData=await current.json().catch(()=>({}));
+    if(!current.ok)throw new Error(currentData.error||'Could not confirm the security check.');
+    if(currentData.verified)return true;
+    let token=turnstileToken;
+    if(!token&&window.turnstile&&turnstileWidgetId!==null){try{token=window.turnstile.getResponse(turnstileWidgetId)}catch{}}
+    if(!token){if(hasActiveAuthSession()||guestAccess){securityRefreshOnly=true;securityResumeGuest=guestAccess&&!hasActiveAuthSession();showLoginGate()}throw new Error('Complete the Cloudflare security check before continuing.')}
+    const response=await fetch('/api/security/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,accepted:true})});
+    const data=await response.json().catch(()=>({}));
+    turnstileToken='';
+    if(window.turnstile&&turnstileWidgetId!==null){try{window.turnstile.reset(turnstileWidgetId)}catch{}}
+    if(!response.ok||!data.verified)throw new Error(data.error||'Cloudflare could not verify this request. Try the security check again.');
+    $('#turnstileStatus').textContent='Security check complete.';
+    return true;
+  })();
+  try{return await securityTicketRequest}finally{securityTicketRequest=null}
+}async function initializeAuth(){
+  try{const response=await fetch('/api/config');if(response.ok){authConfig=await response.json();securityConfig={turnstileConfigured:!!authConfig.turnstileConfigured,turnstileSetupPending:!!authConfig.turnstileSetupPending,turnstileSiteKey:authConfig.turnstileSiteKey||''}}}catch{}
+  await initializeTurnstile();
   if(authConfig.authConfigured&&window.supabase?.createClient){
     try{
       socialAuthClient=window.supabase.createClient(authConfig.supabaseUrl,authConfig.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
@@ -132,23 +181,50 @@ async function initializeAuth(){
   }
   if(authSession?.expires_at&&authSession.expires_at<Date.now()+60000)await refreshAuthSession();
   applyTheme(prefs?.theme||'light');updateAccountUI();
-  if(authConfig.authConfigured&&hasActiveAuthSession()){if(!document.body.classList.contains('authenticated'))await enterAuthenticatedApp()}
-  else if(guestAccess)await enterAuthenticatedApp();
-  else{guestAccess=false;removeSessionValue('learnit-guest');showLoginGate()}
+  const hasSavedAccess=(authConfig.authConfigured&&hasActiveAuthSession())||guestAccess;
+  if(hasSavedAccess){
+    let securityValid=!securityConfig.turnstileConfigured&&!securityConfig.turnstileSetupPending;
+    if(securityConfig.turnstileConfigured){try{const response=await fetch('/api/security/status'),data=await response.json().catch(()=>({}));securityValid=response.ok&&data.verified}catch{}}
+    if(securityValid)await enterAuthenticatedApp();
+    else{securityRefreshOnly=true;securityResumeGuest=guestAccess&&!hasActiveAuthSession();showLoginGate()}
+  }else{guestAccess=false;removeSessionValue('learnit-guest');showLoginGate()}
 }function updateLoginGate(){
-  const ready=!!authConfig.authConfigured;$('#loginTitle').textContent=accountMode==='signup'?'Create your LearnIT account':'Log in to LearnIT';
-  $('#loginIntro').textContent=accountMode==='signup'?'Create an account to start using LearnIT on this device and others.':'Sign in to search study topics, explore course suggestions, and use your study tools.';
+  const ready=!!authConfig.authConfigured,refreshOnly=securityRefreshOnly&&(hasActiveAuthSession()||securityResumeGuest);
+  $('#loginTitle').textContent=refreshOnly?'One quick security check':accountMode==='signup'?'Create your LearnIT account':'Log in to LearnIT';
+  $('#loginIntro').textContent=refreshOnly?'Your account is still signed in. Accept the terms and complete the check to continue.':accountMode==='signup'?'Create an account to start using LearnIT on this device and others.':'Sign in to search study topics, explore course suggestions, and use your study tools.';
   $('#loginSubmit').textContent=accountMode==='signup'?'Create account':'Log in';
   $('#loginToggle').textContent=ready?(accountMode==='signup'?'Already have an account? Log in':'New to LearnIT? Create account'):'Account sign-up is not set up yet';
-  $('#loginPassword').autocomplete=accountMode==='signup'?'new-password':'current-password';$('#loginSubmit').disabled=!ready;$('#loginToggle').disabled=!ready;const consent=$('#loginLegalConsent'),consentInput=$('#loginTerms');consent.hidden=accountMode!=='signup';consentInput.required=accountMode==='signup';
-  $('#loginGuest').hidden=hasActiveAuthSession();
+  $('#loginPassword').autocomplete=accountMode==='signup'?'new-password':'current-password';
+  $('#loginSubmit').disabled=!ready;$('#loginToggle').disabled=!ready;
+  $('#loginEmail').hidden=refreshOnly;$('#loginPassword').hidden=refreshOnly;
+  $('#loginForm label[for="loginEmail"]').hidden=refreshOnly;$('#loginForm label[for="loginPassword"]').hidden=refreshOnly;
+  $('#loginForm .auth-divider').hidden=refreshOnly;
+  $('#loginSubmit').hidden=refreshOnly;$('#loginToggle').hidden=refreshOnly;
+  $('#loginContinue').hidden=!refreshOnly;
+  const consent=$('#loginLegalConsent'),consentInput=$('#loginTerms');consent.hidden=false;consentInput.required=true;
+  $('#loginGuest').hidden=hasActiveAuthSession()||refreshOnly;
+  $('#loginGate .auth-social-group').hidden=refreshOnly;
   $$('[data-oauth-provider]').forEach(button=>{button.disabled=!ready||!socialAuthClient});
-  if(ready){if($('#loginStatus').dataset.setup==='true')$('#loginStatus').textContent='';$('#loginStatus').dataset.setup='false'}
+  if(securityConfig.turnstileSetupPending){$('#loginStatus').textContent='Cloudflare verification setup is incomplete. The site owner must add both Turnstile keys in Render.';$('#loginStatus').dataset.setup='true'}
+  else if(refreshOnly){$('#loginStatus').textContent='Your security check needs renewing. Complete it, then continue to LearnIT.';$('#loginStatus').dataset.setup='true'}
+  else if(ready){if($('#loginStatus').dataset.setup==='true')$('#loginStatus').textContent='';$('#loginStatus').dataset.setup='false'}
   else{$('#loginStatus').textContent='Account sign-in is not enabled on this site yet. The site owner needs to connect a Supabase project in Render. You can preview the study library as a guest.';$('#loginStatus').dataset.setup='true'}
 }function showLoginGate(){$('#welcomeDialog').open&&$('#welcomeDialog').close();$('#accountDialog').open&&$('#accountDialog').close();guestAccess=false;removeSessionValue('learnit-guest');document.body.classList.remove('authenticated');$('#loginGate').hidden=false;updateLoginGate()}
 async function enterAuthenticatedApp(){if(!hasActiveAuthSession()&&!guestAccess){showLoginGate();return}document.body.classList.add('authenticated');$('#loginGate').hidden=true;loadHistoryScope();savedMaterials=[];updateAccountUI();renderSubjects();renderHistory();if(!prefs)setupDialogs();else{applyTheme(prefs.theme);renderHome()}await loadSavedMaterials()}
-function enterGuestApp(){guestAccess=true;setSessionValue('learnit-guest','true');$('#loginStatus').textContent='';enterAuthenticatedApp()}
-function updateAccountUI(){
+async function enterGuestApp(){
+  const input=$('#loginTerms'),status=$('#loginStatus');
+  if(!requireLegalConsent(input,status))return;
+  saveLegalConsent();
+  try{await ensureSecurityTicket();guestAccess=true;setSessionValue('learnit-guest','true');securityRefreshOnly=false;securityResumeGuest=false;status.textContent='';await enterAuthenticatedApp()}
+  catch(error){status.textContent=error.message||'Could not verify this request.'}
+}
+async function continueExistingApp(){
+  const input=$('#loginTerms'),status=$('#loginStatus');
+  if(!requireLegalConsent(input,status))return;
+  saveLegalConsent();
+  try{await ensureSecurityTicket();if(securityResumeGuest){guestAccess=true;setSessionValue('learnit-guest','true')}securityRefreshOnly=false;securityResumeGuest=false;await enterAuthenticatedApp()}
+  catch(error){status.textContent=error.message||'Could not verify this request.'}
+}function updateAccountUI(){
   const signedIn=hasActiveAuthSession(),guest=guestAccess&&!signedIn;
   $('#accountLabel').textContent=signedIn?'Account':guest?'Guest':'Log in';
   $('#accountTitle').textContent=signedIn?'You’re signed in':guest?'Guest preview':accountMode==='signup'?'Create your LearnIT account':'Log in to LearnIT';
@@ -157,23 +233,59 @@ function updateAccountUI(){
   $('#accountSubmit').hidden=signedIn;$('#toggleAccountMode').hidden=signedIn;$('#accountSubmit').disabled=!authConfig.authConfigured;$('#toggleAccountMode').disabled=!authConfig.authConfigured;
   $('#signOutBtn').hidden=!signedIn&&!guest;$('#signOutBtn').textContent=guest?'Return to login':'Sign out';
   $('#accountSubmit').textContent=accountMode==='signup'?'Create account':'Log in';$('#toggleAccountMode').textContent=accountMode==='signup'?'Already have an account? Log in':'New to LearnIT? Create account';
-  $('#accountPassword').autocomplete=accountMode==='signup'?'new-password':'current-password';const accountConsent=$('#accountLegalConsent'),accountConsentInput=$('#accountTerms');accountConsent.hidden=signedIn||accountMode!=='signup';accountConsentInput.required=!signedIn&&accountMode==='signup';
+  $('#accountPassword').autocomplete=accountMode==='signup'?'new-password':'current-password';const accountConsent=$('#accountLegalConsent'),accountConsentInput=$('#accountTerms');accountConsent.hidden=signedIn;accountConsentInput.required=!signedIn;
   $$('#accountForm [data-oauth-provider]').forEach(button=>{button.hidden=signedIn;button.disabled=!authConfig.authConfigured||!socialAuthClient});
   if(signedIn)$('#accountStatus').textContent='';else if(guest)$('#accountStatus').textContent=authConfig.authConfigured?'Log in or create an account to save a login session.':'Account sign-in is not configured yet. You can continue browsing as a guest.';
   else if(!authConfig.authConfigured)$('#accountStatus').textContent='Account service setup is pending. The site owner needs to connect Supabase in Render.';
   updateLoginGate();
 }
 async function signInWithProvider(provider,button){
-  const status=button.closest('#loginGate')?$('#loginStatus'):$('#accountStatus');
+  const inGate=!!button.closest('#loginGate'),status=inGate?$('#loginStatus'):$('#accountStatus'),input=inGate?$('#loginTerms'):$('#accountTerms');
   if(!authConfig.authConfigured||!socialAuthClient){status.textContent='Social sign-in is unavailable until the site owner connects Supabase and enables this provider.';return}
-  status.textContent='Opening '+(provider==='google'?'Google':'Facebook')+' sign-in…';
-  try{const {error}=await socialAuthClient.auth.signInWithOAuth({provider,options:{redirectTo:location.origin}});if(error)throw error}
-  catch(error){status.textContent=error.message||'Could not start social sign-in.'}
+  if(!requireLegalConsent(input,status))return;
+  saveLegalConsent();status.textContent='Checking this sign-in…';
+  try{
+    await ensureSecurityTicket();
+    const check=await fetch('/api/auth/provider-check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,accepted:true})});
+    const checkData=await check.json().catch(()=>({}));
+    if(!check.ok)throw new Error(checkData.error||'Could not verify this sign-in.');
+    status.textContent='Opening '+(provider==='google'?'Google':'Facebook')+' sign-in…';
+    const {error}=await socialAuthClient.auth.signInWithOAuth({provider,options:{redirectTo:location.origin}});
+    if(error)throw error;
+  }catch(error){status.textContent=error.message||'Could not start social sign-in.'}
 }function saveAuthSession(data){if(!data?.access_token)return false;authSession={access_token:data.access_token,refresh_token:data.refresh_token,expires_at:Date.now()+Number(data.expires_in||3600)*1000,user:data.user||authSession?.user||null};localStorage.setItem('learnit-auth',JSON.stringify(authSession));return true}
-async function supabaseAuth(path,body,accessToken=''){const headers={'Content-Type':'application/json',apikey:authConfig.supabaseAnonKey};if(accessToken)headers.Authorization=`Bearer ${accessToken}`;const response=await fetch(`${authConfig.supabaseUrl.replace(/\/$/,'')}/auth/v1/${path}`,{method:'POST',headers,body:body?JSON.stringify(body):undefined});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.msg||data.message||data.error_description||data.error||'Account request failed.');return data}
-async function refreshAuthSession(){if(!authConfig.authConfigured||!authSession?.refresh_token)return;try{const data=await supabaseAuth('token?grant_type=refresh_token',{refresh_token:authSession.refresh_token});saveAuthSession(data)}catch{authSession=null;localStorage.removeItem('learnit-auth')}}
-async function submitAuth(e,gate=false){e.preventDefault();const prefix=gate?'login':'account',status=$(`#${prefix}Status`),email=$(`#${prefix}Email`).value.trim(),passwordField=$(`#${prefix}Password`),button=$(`#${prefix}Submit`);status.textContent='';if(!authConfig.authConfigured){status.textContent='Account sign-in is not enabled on this site yet. You can browse as a guest while the site owner connects Supabase.';return}const password=passwordField.value;if(accountMode==='signup'&&password.length<8){status.textContent='Use a password with at least 8 characters.';return}button.disabled=true;button.textContent=accountMode==='signup'?'Creating account…':'Signing in…';try{if(accountMode==='signup'){const redirect=`${authConfig.supabaseUrl.replace(/\/$/,'')}/auth/v1/signup?redirect_to=${encodeURIComponent(location.origin)}`;const response=await fetch(redirect,{method:'POST',headers:{'Content-Type':'application/json',apikey:authConfig.supabaseAnonKey},body:JSON.stringify({email,password})});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.msg||data.message||data.error_description||'Could not create account.');if(saveAuthSession(data)){guestAccess=false;removeSessionValue('learnit-guest');updateAccountUI();if(!gate)$('#accountDialog').close();enterAuthenticatedApp();status.textContent='Account created.'}else{status.textContent='Account created. Check your email for the confirmation link, then log in.';accountMode='login';updateLoginGate();updateAccountUI()}}else{const data=await supabaseAuth('token?grant_type=password',{email,password});if(!saveAuthSession(data))throw Error('The login response did not include a session.');guestAccess=false;removeSessionValue('learnit-guest');updateAccountUI();if(!gate)$('#accountDialog').close();enterAuthenticatedApp();status.textContent='You are signed in.'}passwordField.value=''}catch(error){status.textContent=error.message}finally{if(button.isConnected){button.disabled=!authConfig.authConfigured;button.textContent=accountMode==='signup'?'Create account':'Log in'}}}
-function submitAccount(e){return submitAuth(e,false)}
+async function supabaseAuth(path,body,accessToken=''){
+  const action=String(path).startsWith('token?grant_type=refresh_token')?'refresh':'logout';
+  const response=await fetch('/api/auth/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,refreshToken:body?.refresh_token||'',accessToken})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.msg||data.message||data.error_description||data.error||'Account request failed.');
+  return data
+}async function refreshAuthSession(){if(!authConfig.authConfigured||!authSession?.refresh_token)return;try{const data=await supabaseAuth('token?grant_type=refresh_token',{refresh_token:authSession.refresh_token});saveAuthSession(data)}catch{authSession=null;localStorage.removeItem('learnit-auth')}}
+async function submitAuth(e,gate=false){
+  e.preventDefault();const prefix=gate?'login':'account',status=$('#'+prefix+'Status'),email=$('#'+prefix+'Email').value.trim(),passwordField=$('#'+prefix+'Password'),button=$('#'+prefix+'Submit'),consent=$('#'+(gate?'loginTerms':'accountTerms'));
+  status.textContent='';
+  if(!requireLegalConsent(consent,status))return;
+  saveLegalConsent();
+  if(!authConfig.authConfigured){status.textContent='Account sign-in is not enabled on this site yet. You can browse as a guest while the site owner connects Supabase.';return}
+  const password=passwordField.value;
+  if(accountMode==='signup'&&password.length<8){status.textContent='Use a password with at least 8 characters.';return}
+  button.disabled=true;button.textContent=accountMode==='signup'?'Creating account…':'Signing in…';
+  try{
+    await ensureSecurityTicket();
+    const response=await fetch('/api/auth/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:accountMode,email,password,accepted:true})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(data.msg||data.message||data.error_description||data.error||'Account request failed.');
+    if(accountMode==='signup'){
+      if(saveAuthSession(data)){guestAccess=false;removeSessionValue('learnit-guest');securityRefreshOnly=false;updateAccountUI();if(!gate)$('#accountDialog').close();enterAuthenticatedApp();status.textContent='Account created.'}
+      else{status.textContent='Account created. Check your email for the confirmation link, then log in.';accountMode='login';updateLoginGate();updateAccountUI()}
+    }else{
+      if(!saveAuthSession(data))throw Error('The login response did not include a session.');
+      guestAccess=false;securityRefreshOnly=false;securityResumeGuest=false;removeSessionValue('learnit-guest');updateAccountUI();if(!gate)$('#accountDialog').close();enterAuthenticatedApp();status.textContent='You are signed in.'
+    }
+    passwordField.value=''
+  }catch(error){status.textContent=error.message}
+  finally{if(button.isConnected){button.disabled=!authConfig.authConfigured;button.textContent=accountMode==='signup'?'Create account':'Log in'}}
+}function submitAccount(e){return submitAuth(e,false)}
 async function signOut(){
   if(authSession?.access_token&&authConfig.authConfigured){try{await supabaseAuth('logout',null,authSession.access_token)}catch{}}
   if(socialAuthClient){try{await socialAuthClient.auth.signOut({scope:'local'})}catch{}}
@@ -205,7 +317,7 @@ async function signOut(){
     for(let attempt=0;attempt<5;attempt++){
       const requestBody={messages:[{role:'system',content:system},{role:'user',content:userContent}]};
       if(kind==='bundle')requestBody.response_format=studyBundleResponseFormat(Number($('#flashcardCount').value),Number($('#quizCount').value));
-      response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(requestBody)});
+      await ensureSecurityTicket();response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(requestBody)});
       data=await response.json().catch(()=>({}));
       const providerError=String(data.error||'').toLowerCase();
       const setupIssue=/ai features need setup|not configured/.test(providerError);
@@ -355,7 +467,7 @@ function openSettings(){$('#settingsFields').innerHTML=fieldsMarkup(selectedFiel
 $('#welcomeForm').addEventListener('submit',e=>{if(e.submitter?.id!=='saveWelcome')return;e.preventDefault();const chosen=$$('#welcomeFields input:checked').map(x=>x.value);const exploring=$('#exploring').checked;if(!chosen.length&&!exploring){toast('Choose at least one field or select “I’m exploring.”');return}prefs={fields:chosen,exploring,theme:$('input[name="theme"]:checked').value};savePrefs();applyTheme(prefs.theme);$('#welcomeDialog').close();renderHome();renderSubjects()});
 $('#settingsForm').addEventListener('submit',e=>{if(e.submitter?.id!=='saveSettings')return;e.preventDefault();const chosen=$$('#settingsFields input:checked').map(x=>x.value),exploring=$('#settingsExploring').checked;if(!chosen.length&&!exploring){toast('Choose at least one field or select “I’m exploring.”');return}prefs={fields:chosen,exploring,theme:$('input[name="settingTheme"]:checked').value};savePrefs();applyTheme(prefs.theme);$('#settingsDialog').close();renderHome();renderSubjects();toast('Settings saved')});
 $$('input[name="theme"],input[name="settingTheme"]').forEach(input=>input.addEventListener('change',e=>{applyTheme(e.target.value);if(e.target.name==='settingTheme'&&prefs){prefs={...prefs,theme:e.target.value};savePrefs()}}));
-$('#loginForm').addEventListener('submit',e=>submitAuth(e,true));$('#loginGuest').addEventListener('click',enterGuestApp);$('#loginToggle').addEventListener('click',()=>{accountMode=accountMode==='signup'?'login':'signup';$('#loginStatus').textContent='';updateLoginGate()});$('#accountForm').addEventListener('submit',submitAccount);$('#toggleAccountMode').addEventListener('click',()=>{accountMode=accountMode==='signup'?'login':'signup';$('#accountStatus').textContent='';updateAccountUI()});$('#signOutBtn').addEventListener('click',signOut);$('#closeAccount').addEventListener('click',()=>$('#accountDialog').close());
+$('#loginForm').addEventListener('submit',e=>submitAuth(e,true));$('#loginGuest').addEventListener('click',enterGuestApp);$('#loginContinue').addEventListener('click',continueExistingApp);$('#loginToggle').addEventListener('click',()=>{accountMode=accountMode==='signup'?'login':'signup';$('#loginStatus').textContent='';updateLoginGate()});$('#accountForm').addEventListener('submit',submitAccount);$('#toggleAccountMode').addEventListener('click',()=>{accountMode=accountMode==='signup'?'login':'signup';$('#accountStatus').textContent='';updateAccountUI()});$('#signOutBtn').addEventListener('click',signOut);$('#closeAccount').addEventListener('click',()=>$('#accountDialog').close());
 $('#lumiChatForm').addEventListener('submit',submitLumiChat);$('#lumiChatInput').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('#lumiChatForm').requestSubmit()}});$('#clearLumiChat').addEventListener('click',clearLumiChat);$$('[data-lumi-prompt]').forEach(button=>button.addEventListener('click',()=>{$('#lumiChatInput').value=button.dataset.lumiPrompt;$('#lumiChatInput').focus()}));
 $('#fileInput').addEventListener('change',async e=>{
   const file=e.target.files[0];if(!file)return;
@@ -365,7 +477,7 @@ $('#fileInput').addEventListener('change',async e=>{
   $('#fileActions').hidden=true;$('#reviewerOutput').hidden=true;$('#flashcardOutput').hidden=true;$('#plainLanguageOutput').hidden=true;$('#gapOutput').hidden=true;$('#bundleQuizOutput').hidden=true;$('#sourceMaterialOutput').hidden=true;
   $('#fileStatus').textContent='Extracting text from your file…';
   try{
-    const response=await fetch('/api/extract?name='+encodeURIComponent(file.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file});
+    await ensureSecurityTicket();const response=await fetch('/api/extract?name='+encodeURIComponent(file.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file});
     const extracted=await response.json().catch(()=>({error:'The file is larger than the current hosting capacity or could not be processed.'}));
     if(!response.ok)throw Error(extracted.error||'File extraction failed.');
     uploadedText=extracted.text;currentMaterial=uploadedText;
@@ -385,3 +497,4 @@ $('#mobileNavBackdrop').addEventListener('click',()=>setMobileNavOpen(false));
 $$('#mainNav a').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();navigate(link.getAttribute('href').slice(1))}));
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('mobile-nav-open'))setMobileNavOpen(false)});
 window.addEventListener('resize',()=>{if(window.innerWidth>900&&document.body.classList.contains('mobile-nav-open'))setMobileNavOpen(false)});
+

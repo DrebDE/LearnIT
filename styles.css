@@ -402,3 +402,15 @@ footer{border-color:var(--line);font-family:Inter,Arial,sans-serif;font-size:10p
 .lumi-chat-content blockquote{margin:.65rem 0;padding:.2rem .8rem;border-left:3px solid var(--brand);background:var(--surface2);color:var(--muted)}
 .lumi-chat-content strong{color:var(--text);font-weight:700}
 .lumi-chat-content code,.reviewer-rich code{padding:.08em .28em;border-radius:4px;background:var(--surface2);font:.92em ui-monospace,Consolas,monospace}
+/* Keep the login story panel high-contrast in every selected color scheme. */
+#loginGate .login-aside{background-color:#17483d!important;background-image:linear-gradient(90deg,transparent 49.7%,rgba(255,255,255,.035) 50%,transparent 50.3%),linear-gradient(0deg,transparent 49.7%,rgba(255,255,255,.035) 50%,transparent 50.3%)!important;color:#f5f1e8}
+#loginGate .login-brand,#loginGate .login-note h2{color:#fff9ed!important}
+#loginGate .login-brand small{color:#d5e4dc!important}
+#loginGate .login-note>p:last-child{color:#e0ebe5!important}
+#loginGate .login-aside-foot p{color:#e3e9e2!important}
+.turnstile-box{display:flex;min-height:0;justify-content:flex-start;margin:12px 0 2px}
+.turnstile-status{min-height:0;margin:2px 0 10px;font-size:11px}
+.turnstile-status:empty{display:none}
+#loginContinue[hidden]{display:none!important}
+#loginGate [hidden]{display:none!important}
+
